@@ -213,7 +213,7 @@ val = cal2Top.estimate(167) - cal2Bot.estimate(167)
 print(val, " um or ", val / dx_df, " uN force")
 
 print("Impulse Force Calculations: ", )
-val = f_pulse.intercept - cal1Top.intercept
+val = cal1Top.intercept - f_pulse.intercept 
 print(val, " um or ", val / dx_df, " uN force")
 
 # Plot signals

@@ -171,7 +171,7 @@ pulse = numpy.add(cal1_pulse.pulse, cal2_pulse.pulse)
 # on graph paper it appears to be 1259.286 at 107min)
 # subtract our offset of 1249.36 then scale is 0->10.3953 for maximum thermal
 # then remove the 'impulse' contribution of 3.77
-thermal = Thermal(times, start=60, center=107, offset=0)
+thermal = Thermal(times, start=60, center=107, offset=3.77)
 
 # build composite signal
 total = numpy.add(pulse, impulse.pulse)
@@ -213,7 +213,7 @@ val = cal2Top.estimate(167) - cal2Bot.estimate(167)
 print(val, " um or ", val / dx_df, " uN force")
 
 print("Impulse Force Calculations: ", )
-val = f_pulse.intercept - cal1Top.intercept
+val = cal1Top.intercept - f_pulse.intercept 
 print(val, " um or ", val / dx_df, " uN force")
 
 # Plot signals
