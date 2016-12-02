@@ -14,7 +14,7 @@ See the files in this repository for more background information on how the plot
 
 The goal is to use this code to build methods to test the predictability of their impulse model and compare the simulation to their results.  This model can be made more complex by adding in additional sweeps and monte carlo simulations of different forces and shapes to compare them to what was predicted in the Eagleworks paper.
 
-![Background explination of code in PDF](./background.pdf)
+![Background explanation of code in PDF](./background.pdf)
 
 ## Installation
 
