@@ -16,7 +16,7 @@ The goal is to use this code to build methods to test the predictability of thei
 
 ![Background explanation of code in PDF](./background.pdf)
 
-![Some supporting calcuations in libreoffice calc](./EW-data.ods)
+![Some supporting calculations in libreoffice calc](./EW-data.ods)
 
 ## Installation
 
