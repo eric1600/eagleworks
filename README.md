@@ -8,13 +8,27 @@ See the files in this repository for more background information on how the plot
 ![Eagleworks Paper in PDF](./final-paper.pdf)
 ![Eagleworks Paper with critical comments in PDF](./final-paper-comments.pdf)
 
+![Eagleworks Paper in PDF](./final-paper.pdf)
+
+![Eagleworks Paper with critical comments in PDF](./final-paper-comments.pdf)
+
 ## Motivation
 
 The goal is to use this code to build methods to test the predictability of their impulse model and compare the simulation to their results.  This model can be made more complex by adding in additional sweeps and monte carlo simulations of different forces and shapes to compare them to what was predicted in the Eagleworks paper.
 
+![Background explanation of code in PDF](./background.pdf)
+
+![Some supporting calculations in libreoffice calc](./EW-data.ods)
+
 ## Installation
 
-To run this simulation you need python 2.7+ or 3 and libraryies: scipy, matplotlib and numpy
+To run this simulation you need python 2.7+ or 3 and libraries: scipy, matplotlib and numpy
+
+python test1.py
+Runs the test with all Eagleworks time windows and best estimations
+
+python test2.py
+An example that runs the same tests as test1.py with a minor adjustment on the force pulse window that fits the curve better.
 
 ## Contributors
 
