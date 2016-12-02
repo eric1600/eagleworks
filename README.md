@@ -22,6 +22,12 @@ The goal is to use this code to build methods to test the predictability of thei
 
 To run this simulation you need python 2.7+ or 3 and libraries: scipy, matplotlib and numpy
 
+python test1.py
+Runs the test with all Eagleworks time windows and best estimations
+
+python test2.py
+An example that runs the same tests as test1.py with a minor adjustment on the force pulse window that fits the curve better.
+
 ## Contributors
 
 Feel free to add your own models, curvfits or other data to this repository.
