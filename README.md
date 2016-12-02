@@ -5,6 +5,8 @@ This is some python code to attempt to duplicate the calculations done in a pape
 ## Background
 
 See the files in this repository for more background information on how the plots were generated and how you can contribute to making this simulation either demonstrate the idea of superimposed impluse force from the EM Drive is properly analyzed.  It is my hope that the raw test data will be released to the public so it can be statistically analysed instead of simulated as it is done here.
+![Eagleworks Paper in PDF](./final-paper.pdf)
+![Eagleworks Paper with critical comments in PDF](./final-paper-comments.pdf)
 
 ## Motivation
 
