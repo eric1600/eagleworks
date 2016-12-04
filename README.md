@@ -24,10 +24,13 @@ The goal is to use this code to build methods to test the predictability of thei
 To run this simulation you need python 2.7+ or 3 and libraries: scipy, matplotlib and numpy
 
 python test1.py
-Runs the test with all Eagleworks time windows and best estimations
+Runs the test with all Eagleworks time windows and best estimations (note an error in pulse force calculation exits)
 
 python test2.py
-An example that runs the same tests as test1.py with a minor adjustment on the force pulse window that fits the curve better.
+An example that runs the same tests as test1.py with a minor adjustment on the force pulse window that fits the curve better. (note an error in pulse force calculation exits)
+
+python test3.py
+Has fix for force calculation and has a 6th order polynomial fit for thermal curve.  Also force pulse is set to 0 to try to duplicate the 106uN measurement.  Details about this are in both the [background.pdf](./background.pdf) and the [spreadsheet](./EW-data.ods).
 
 ## Contributors
 
