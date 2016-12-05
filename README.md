@@ -32,6 +32,9 @@ An example that runs the same tests as test1.py with a minor adjustment on the f
 python test3.py
 Has fix for force calculation and has a 6th order polynomial fit for thermal curve.  Also force pulse is set to 0 to try to duplicate the 106uN measurement.  Details about this are in both the [background.pdf](./background.pdf) and the [spreadsheet](./EW-data.ods).
 
+python test4.py
+This has a new dataset that was extracted digitally from Figure 7 of the Eagleworks paper.  The data set can be found in [ew-graph.csv](./ew-graph.csv)
+
 ## Contributors
 
 Feel free to add your own models, curvfits or other data to this repository.
