@@ -67,6 +67,11 @@ class Pulse:
 class Thermal:
     """Generate thermal signal profile, quicker rise than cool"""
 
+	# For reference, but not used:
+	# Eagleworks thermal model both curves fit r^2>0.999 (From Fig. 5 in their paper)
+	# rise curve(0-5 min):  f(x) =  - 0.0064354826x^4 + 0.0903571004x^3 - 0.5212241274x^2 + 1.947007813x + 0.0530313985
+	# fall curve(5-10min): f(x) = 0.0065180865x^4 - 0.2227500576x^3 + 2.8971895487x^2 - 17.4937755423x + 42.8137121961
+
     def __init__(self, time, start=45., offset=-1249.360):
         signal = numpy.array([])
         # full rise-fall curve fit with following error estimates:
@@ -217,32 +222,39 @@ total=data.labdata
 print("Pulse 1 Top")
 cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
 cal1Top.prnt()
+print('Eagleworks:  m= 0.004615 b=1249.360 errors m_err=', 0.004615-cal1Top.slope, 'b_err=',1249.360-cal1Top.intercept)
 
 print("Pulse 1 Bottom")
 cal1Bot = Calc(times, total, 11.4, 28.6)  # EW time window
 cal1Bot.prnt()
+print('Eagleworks:  m= 0.005096 b=1248.367 errors m_err=', 0.005096-cal1Bot.slope, 'b_err=',1248.367-cal1Bot.intercept)
 
 # Compute curve filts for Pulse 2 Windows
 cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
 print("Pulse 2 Top")
 cal2Top.prnt()
+print('Eagleworks:  m= -0.07825 b=1263.499  errors m_err=', -0.07825-cal2Top.slope, 'b_err=',1263.499-cal2Top.intercept)
 
 print("Pulse 2 Bottom")
 cal2Bot = Calc(times, total, 163.2, 171.6)  # EW time window
 cal2Bot.prnt()
+print('Eagleworks:  m= -0.0827 b=1263.163   errors m_err=', -0.0827-cal2Bot.slope, 'b_err=',1263.163 -cal2Bot.intercept)
 
 # Compute Pulse Force
 print("Pulse Force")
 f_pulse = Calc(times, total, 83.8, 102.8)  # EW time window
 f_pulse.prnt()
+print('Eagleworks:  m=0.13826 b=1245.238  errors m_err=',0.13826-f_pulse.slope, 'b_err=',1245.238 -f_pulse.intercept)
 
 print("CAL1 Pulse Separation: ", )
 Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)
 print(Cal1_dx_val, " um or ", Cal1_dx_val / dx_df, " uN force")
 
+
 print("CAL2 Pulse Separation: ", )
 Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)
 print(Cal2_dx_val, " um or ", Cal2_dx_val / dx_df, " uN force")
+
 
 print("Impulse Force Calculations: ", )
 # compute shifted intercept line using time of 59.0519660294 which
@@ -286,4 +298,4 @@ fig.savefig('signals_t4.png')
 fig1.savefig('combined_t4.png')
 
 # Uncomment if you prefer on-screen plots
-plt.show()
+#plt.show()
