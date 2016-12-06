@@ -262,6 +262,8 @@ print("Impulse Force Calculations: ", )
 # for their shifted offset
 shifted_b = (cal1Top.slope - f_pulse.slope) * 59.0519660294 + cal1Top.intercept
 val = cal1Top.intercept - shifted_b
+print ('shifted_b =',shifted_b, ' and Cal1 b=',cal1Top.intercept)
+print('Eagleworks shifted_b=1241.468 error =',1241.468-shifted_b)
 dx_df = ((Cal1_dx_val + Cal2_dx_val) / 2) / 29 # 29uN, but x is normalized from um so E-6 is dropped
 print(val, " um or ", val / dx_df, " uN force and dx/df =", dx_df)
 
