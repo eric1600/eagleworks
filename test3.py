@@ -124,8 +124,8 @@ class Calc:
 
 
 # TIME array
-span = 200  # minutes to run
-resolution = 0.5  # in minutes
+span = 200  # seconds to run
+resolution = 0.5  # in seconds
 times = numpy.linspace(0, span, span / resolution + 1, endpoint=True)
 
 # Gaussian noise array
@@ -164,7 +164,7 @@ pulse = numpy.add(cal1_pulse.pulse, cal2_pulse.pulse)
 
 # From Fig. 8 using dx=0.13826*t+1245.238 for the thermal pulse slope
 # we find at t=105 the peak is 1259.7553 (from careful plotting, 
-# on graph paper it appears to be 1259.286 at 107min)
+# on graph paper it appears to be 1259.286 at 107 s)
 # subtract our offset of 1249.36 then scale is 0->10.3953 for maximum thermal
 # then remove the 'impulse' contribution of 3.77
 thermal = Thermal(times, start=60, offset=-1249.360)

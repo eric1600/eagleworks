@@ -69,8 +69,8 @@ class Thermal:
 
 	# For reference, but not used:
 	# Eagleworks thermal model both curves fit r^2>0.999 (From Fig. 5 in their paper)
-	# rise curve(0-5 min):  f(x) =  - 0.0064354826x^4 + 0.0903571004x^3 - 0.5212241274x^2 + 1.947007813x + 0.0530313985
-	# fall curve(5-10min): f(x) = 0.0065180865x^4 - 0.2227500576x^3 + 2.8971895487x^2 - 17.4937755423x + 42.8137121961
+	# rise curve(0-5):  f(x) =  - 0.0064354826x^4 + 0.0903571004x^3 - 0.5212241274x^2 + 1.947007813x + 0.0530313985
+	# fall curve(5-10): f(x) = 0.0065180865x^4 - 0.2227500576x^3 + 2.8971895487x^2 - 17.4937755423x + 42.8137121961
 
     def __init__(self, time, start=45., offset=-1249.360):
         signal = numpy.array([])
@@ -159,8 +159,8 @@ class Calc:
 
 
 # TIME array
-span = 200  # minutes to run
-resolution = 0.5  # in minutes
+span = 200  # seconds to run
+resolution = 0.5  # in seconds
 times = numpy.linspace(0, span, span / resolution + 1, endpoint=True)
 
 # Load Lab Data
