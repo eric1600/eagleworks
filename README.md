@@ -36,7 +36,7 @@ Has fix for force calculation and has a 6th order polynomial fit for thermal cur
 This has a new dataset that was extracted digitally from Figure 7 of the Eagleworks paper.  The data set can be found in [ew-graph.csv](./ew-graph.csv)
 
 * test5.py
-This code tests out the models presented in Fig. 5 of the Eagleworks paper.  Curve fits were made for both the force pulse and the thermal profile.  The code was then written to scale both the time base and amplitude to allow for duplicating measured results just testing their model.  These results show that even with 0 force there is ~92 uN of force present using the peak scale of Figure 8.  This implies that they are unable to seperate the force from the thermal as they theorized.  More testing to be done.  One side note is the time window for the pulse calculation had to be shorted by a few seconds from Eagleworks numbers to fit the slope of their model better.
+This code tests out the models presented in Fig. 5 of the Eagleworks paper.  Curve fits were made for both the force pulse and the thermal profile.  The code was then written to scale both the time base and amplitude to allow for duplicating measured results just testing their model.  These results show that even with 0 force there is ~92 uN of force present using the peak scale of Figure 8.  This implies that they are unable to seperate the force from the thermal as they theorized.  More testing to be done.  One side note is the time window for the pulse calculation had to be shorted by a few seconds from Eagleworks numbers to fit the slope of their model better.  Click this link to ![see the graphs and short discussion of the test5 results](https://imgur.com/a/Whfiu).
 
 ## Contributors
 
