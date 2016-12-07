@@ -19,21 +19,24 @@ The goal is to use this code to build methods to test the predictability of thei
 
 ![Some supporting calculations in libreoffice calc](./EW-data.ods)
 
-## Installation
+## Test Overview
 
 To run this simulation you need python 2.7+ or 3 and libraries: scipy, matplotlib and numpy
 
-python test1.py
+* test1.py (contains errors)
 Runs the test with all Eagleworks time windows and best estimations (note an error in pulse force calculation exits)
 
-python test2.py
+* test2.py (contains errors)
 An example that runs the same tests as test1.py with a minor adjustment on the force pulse window that fits the curve better. (note an error in pulse force calculation exits)
 
-python test3.py
+* test3.py (contains errors)
 Has fix for force calculation and has a 6th order polynomial fit for thermal curve.  Also force pulse is set to 0 to try to duplicate the 106uN measurement.  Details about this are in both the [background.pdf](./background.pdf) and the [spreadsheet](./EW-data.ods).
 
-python test4.py
+* test4.py (matches EW calcuations)
 This has a new dataset that was extracted digitally from Figure 7 of the Eagleworks paper.  The data set can be found in [ew-graph.csv](./ew-graph.csv)
+
+* test5.py
+This code tests out the models presented in Fig. 5 of the Eagleworks paper.  Curve fits were made for both the force pulse and the thermal profile.  The code was then written to scale both the time base and amplitude to allow for duplicating measured results just testing their model.  These results show that even with 0 force there is ~92 uN of force present using the peak scale of Figure 8.  This implies that they are unable to seperate the force from the thermal as they theorized.  More testing to be done.  One side note is the time window for the pulse calculation had to be shorted by a few seconds from Eagleworks numbers to fit the slope of their model better.
 
 ## Contributors
 
