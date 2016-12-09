@@ -1,8 +1,39 @@
 from __future__ import division  # avoid integer division for python2
 from __future__ import print_function  # make python 2.7 and 3 print compatible
 from scipy import stats
+from scipy.stats.stats import pearsonr
 import matplotlib.pyplot as plt
 import numpy
+import csv
+
+
+class LabData:
+    """Handle measured data"""
+
+    def __init__(self, time, filename='ew-graph.csv'):
+        tdata = numpy.array([])
+        xdata = numpy.array([])
+        xsample = numpy.array([])
+
+        with open(filename, 'rb') as csvfile:
+            filereader = csv.reader(csvfile)
+            for row in filereader:
+                tdata = numpy.append(tdata, row[0])
+                xdata = numpy.append(xdata, row[1])
+
+        tdata = tdata.astype('float64')
+        xdata = xdata.astype('float64')
+
+        for t in numpy.nditer(time):
+            if t <= tdata[0]:
+                xsample = numpy.append(xsample, xdata[0])
+            elif t >= tdata[-1]:
+                xsample = numpy.append(xsample, xdata[-1])
+            else:
+                index = numpy.where(tdata > t)
+                i = index[0][0]
+                xsample = numpy.append(xsample, (numpy.interp(t, [tdata[i - 1], tdata[i]], [xdata[i - 1], xdata[i]])))
+        self.data = xsample
 
 
 class Pulse:
@@ -204,16 +235,25 @@ noise = numpy.random.normal(mu, sigma, times.size)
 #     calibration pulse magnitude of 29 uN."
 dx_df = 0.0338965517
 
-peaks = [0, 2.5, 5, 10.035]
-# peaks = [10.035] # Peak shown in Figure 8.
+# Load Lab Data
+data = LabData(times)
 
-impulses = [0, 1, 2, 3, 4]
-# impulses = [3.77]
+# peaks = [0, 2.5, 5, 10.035]
+peaks = [6.75]  # Peak shown in Figure 8.
+
+# impulses = [0, 1, 2, 3, 4]
+impulses = [3.7625]
 
 # About thermal model from Fig. 8:
 # we find at t=106.43 the peak is 1259.3950437986 from digitizing their plot (see ew-graph.csv),
 # subtract our baseline offset of 1249.36 then scale is 0->10.035 for maximum thermal
 # thermal curve is computed using Figure 5 model
+
+# Based on Figure 5:
+# Thermal model peaks at 4.04 at 5 seconds
+# Pulse model ramps up at 0-1 to a value of 3 until 4-5 where it ramps to 0
+# time and peak values will be scaled to match data as needed
+
 cal1_pulse = Pulse(times, high=0, low=-1.078, start=5, end=35, pos=8, neg=5)
 cal2_pulse = Pulse(times, high=0, low=-1.078, start=160, end=180, pos=8, neg=5)
 pulse = numpy.add(cal1_pulse.data, cal2_pulse.data)
@@ -221,8 +261,8 @@ pulse = numpy.add(cal1_pulse.data, cal2_pulse.data)
 print("Force Thermal um uN")
 for peak in peaks:
     for force in impulses:
-        thermal = Thermal(times, start=60, center=107, offset=0, peak=peak)
-        impulse = ForcePulse(times, high=0, low=force, start=58, end=115)
+        thermal = Thermal(times, start=70, center=114, offset=0, peak=peak)  # start=60, center=107
+        impulse = ForcePulse(times, high=0, low=force, start=62, end=119)  # start = 58, end = 115
 
         # build composite signal
         total = numpy.add(pulse, impulse.data)
@@ -256,6 +296,11 @@ for peak in peaks:
 
         print(force, peak, val, val / dx_df)
 
+# Pearson Coefficient
+# https://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
+# how to understand http://www.statstutor.ac.uk/resources/uploaded/pearsons.pdf
+pearson=pearsonr(total, data.data)[0]
+
 # Plot signals
 fig = plt.figure(figsize=(8, 6), dpi=80)
 ax = fig.add_subplot(4, 1, 1)
@@ -273,20 +318,46 @@ ax.set_ylabel('thermal')
 ax = fig.add_subplot(4, 1, 4)
 ax.plot(times, total)
 ax.set_ylabel('total')
+ax.set_xlabel('time (s)')
 
 # Create larger result plot with linear line estimates added in
 fig1 = plt.figure(figsize=(8, 6), dpi=80)
 ax = fig1.add_subplot(111)
-plt.plot(times, total)
-plt.plot(cal1Top.time, cal1Top.interp())
-plt.plot(cal1Bot.time, cal1Bot.interp())
-plt.plot(f_pulse.time, f_pulse.interp())
-plt.plot(cal2Top.time, cal2Top.interp())
-plt.plot(cal2Bot.time, cal2Bot.interp())
-ax.set_ylabel('total')
+plt.plot(times, total, '-k', label="Total")
+plt.plot(times, data.data, '-m', label='Lab Data', linewidth=3.0)
+plt.plot(cal1Top.time, cal1Top.interp(), '-r', label='Cal1 Top', linewidth=3.0)
+plt.plot(cal1Bot.time, cal1Bot.interp(), '-b', label='Cal1 Bot', linewidth=3.0)
+plt.plot(f_pulse.time, f_pulse.interp(), '-c', label='Pulse', linewidth=3.0)
+plt.plot(cal2Top.time, cal2Top.interp(), '-r', label='Cal2 Top', linewidth=3.0)
+plt.plot(cal2Bot.time, cal2Bot.interp(), '-b', label='Cal2 Bot', linewidth=3.0)
+plt.text(14, 1258, "Pearson={0:0.5f}".format(pearson))
+ax.set_ylabel('Displacement (um)')
+ax.set_xlabel('Time (s)')
+plt.legend(loc='upper right')
+
+#  'r' = red
+#  'g' = green
+#  'b' = blue
+#  'c' = cyan
+#  'm' = magenta
+#  'y' = yellow
+#  'k' = black
+#  'w' = white
+#
+# Options for line styles are
+#
+#  '-' = solid
+#  '--' = dashed
+#  ':' = dotted
+#  '-.' = dot-dashed
+#  '.' = points
+#  'o' = filled circles
+#  '^' = filled triangles
+
 
 fig.savefig('signals_t5.png')
 fig1.savefig('combined_t5.png')
 
 # Uncomment if you prefer on-screen plots
-# plt.show()
+plt.show()
+

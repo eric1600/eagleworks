@@ -33,7 +33,7 @@ class LabData:
                 index = numpy.where(tdata > t)
                 i = index[0][0]
                 xsample = numpy.append(xsample, (numpy.interp(t, [tdata[i - 1], tdata[i]], [xdata[i - 1], xdata[i]])))
-        self.labdata = xsample
+        self.data = xsample
 
 
 class ForcePulse:
@@ -157,14 +157,11 @@ data = LabData(times)
 dx_df = 0.0338965517
 
 # Using force pulse model outlined in Figure 5
-# low = -2.076 removes all force from thermal+force curve
-# low = 0 shows 103uN (vs. expected of 106uN)
-# low = -3.77 (or 106uN) yields force of -84.5 uN
-# low = -3.7625 (about 106uN using computed dx/df = 0.0354953532734 from calibration pulses on data
+# low = 3.7625 yields 209.448
 impulse = ForcePulse(times, high=0, low=3.7625, start=58, end=115)  # timings for this is approximate
 
 # Take total data from EW data - no composite signals used
-total = data.labdata
+total = data.data
 total = numpy.add(total, impulse.data)
 
 # REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
@@ -233,13 +230,15 @@ ax.set_ylabel('total')
 # Create larger result plot with linear line estimates added in
 fig1 = plt.figure(figsize=(8, 6), dpi=80)
 ax = fig1.add_subplot(111)
-plt.plot(times, total)
-plt.plot(cal1Top.time, cal1Top.interp())
-plt.plot(cal1Bot.time, cal1Bot.interp())
-plt.plot(f_pulse.time, f_pulse.interp())
-plt.plot(cal2Top.time, cal2Top.interp())
-plt.plot(cal2Bot.time, cal2Bot.interp())
-ax.set_ylabel('total')
+plt.plot(times, total, '-k', label="Total")
+plt.plot(cal1Top.time, cal1Top.interp(), '-r', label='Cal1 Top', linewidth=3.0)
+plt.plot(cal1Bot.time, cal1Bot.interp(), '-b', label='Cal1 Bot', linewidth=3.0)
+plt.plot(f_pulse.time, f_pulse.interp(), '-c', label='Pulse', linewidth=3.0)
+plt.plot(cal2Top.time, cal2Top.interp(), '-r', label='Cal2 Top', linewidth=3.0)
+plt.plot(cal2Bot.time, cal2Bot.interp(), '-b', label='Cal2 Bot', linewidth=3.0)
+ax.set_ylabel('Displacement (um)')
+ax.set_xlabel('Time (s)')
+plt.legend(loc='upper right')
 
 fig.savefig('signals_t4.png')
 fig1.savefig('combined_t4.png')
