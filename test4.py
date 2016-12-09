@@ -36,70 +36,56 @@ class LabData:
         self.labdata = xsample
 
 
-class Pulse:
-    """Build Pulse Signal:
-        PULSE starts at HIGH value, goes to LOW at start with duration of NEG
-        stays LOW until END and then returns to HIGH in POS time counts """
+class ForcePulse:
+    """Build Force Pulse Signal from Figure 5 model of eagleworks paper:
+        PULSE starts at HIGH value, goes to LOW following the timing and slopes given in Figure 5.
+        The curves are rescaled in both time and amplitude to fit the desired experimental constraints"""
 
-    def __init__(self, time, high=10., low=5., start=60., end=120., pos=5., neg=6.):
+    def __init__(self, time, high=0, low=3.77, start=60., end=110):
         signal = numpy.array([])
+
+        # rise (0-1):  f(x) = 2.9873202637x + 0.0236544518
+        # R^2 = 0.9991409013
+
+        # top (1-4): f(x) = 0.0012770362x + 3.0165657699
+        # R^2 = 0.9999989071
+        # peak value = 3.0215812262
+        peak = 3.0215812262
+
+        # fall (4-5): f(x) =  - 2.9987385162x + 14.9945782273
+        # R^2 = 0.998996942
+
+        # elsewhere f(x)=0
+
+        span = end - start  # pulse width
+        stepsize = 5 / span
+        rise_done = 1 / stepsize
+        top_done = 4 / stepsize
+        fall_done = 5 / stepsize
 
         for t in numpy.nditer(time):
             value = 0
+
+            # rescale time
+            x = (t - start) * stepsize
+
             if t < start:
-                value = high
-            elif t < start + neg:
-                # linear slope down
-                m = (low - high) / neg
-                b = low - m * neg
-                value = m * (t - start) + b
-            elif t < end - pos:
-                value = low
-            elif t < end:
-                # linear slope up
-                m = (low - high) / pos
-                b = low - m * pos
-                value = m * (end - t) + b
-            elif t >= end:
-                value = high
+                value = high / peak
+            elif t < start + rise_done:
+                # linear slope
+                value = 2.9873202637 * x + 0.0236544518
+                value = value * low / peak
+            elif t < start + top_done:
+                value = 0.0012770362 * x + 3.0165657699
+                value = value * low / peak
+            elif t < start + fall_done:
+                value = -2.9987385162 * x + 14.9945782273
+                value = value * low / peak
+            elif t >= start + fall_done:
+                value = high / peak
+
             signal = numpy.append(signal, value)
-        self.pulse = signal
-
-
-class Thermal:
-    """Generate thermal signal profile, quicker rise than cool"""
-
-    # For reference, but not used:
-    # Eagleworks thermal model both curves fit r^2>0.999 (From Fig. 5 in their paper)
-    # rise curve(0-5):  f(x) =  - 0.0064354826x^4 + 0.0903571004x^3 - 0.5212241274x^2 + 1.947007813x + 0.0530313985
-    # fall curve(5-10): f(x) = 0.0065180865x^4 - 0.2227500576x^3 + 2.8971895487x^2 - 17.4937755423x + 42.8137121961
-
-    def __init__(self, time, start=45., offset=-1249.360):
-        signal = numpy.array([])
-        # full rise-fall curve fit with following error estimates:
-        # r^2 = 0.992116
-        #       um                          uN
-        # max   0.6901810304                20.3613935709
-        # min  -0.4266644384               -12.5872519989
-        # ave   1.48698258928764E-05         0.0004386826
-        # stdev 0.3454826627                10.1922657362
-
-        # curve fit r^2 = 0.99361
-
-        for t in numpy.nditer(time):
-            if t < start:
-                value = 0  # RF amp off, no thermal
-            else:
-                # sixth order poly fit
-                value = 0.000000000071282927264184 * numpy.power(t, 6)
-                value = value - 0.0000000616854969614949 * numpy.power(t, 5)
-                value = value + 0.0000214062587544044 * numpy.power(t, 4)
-                value = value - 0.0037728812 * numpy.power(t, 3)
-                value = value + 0.3506329937 * numpy.power(t, 2)
-                value = value + -15.9748263936 * t
-                value = value + 1527.7174983854 + offset
-            signal = numpy.append(signal, value)
-        self.thermal = signal
+        self.data = signal
 
 
 class Calc:
@@ -139,7 +125,7 @@ class Calc:
 
     def interp(self):
         """Produce line based on linear fit and time window
-            returns array of line and it correspondes to self.time array
+            returns array of line and it corresponds to self.time array
         """
         line = numpy.array([])
         for t in numpy.nditer(self.time):
@@ -165,61 +151,24 @@ resolution = 0.5  # in seconds
 times = numpy.linspace(0, span, span / resolution + 1, endpoint=True)
 
 # Load Lab Data
-# resample to times array
 data = LabData(times)
 
-# Gaussian noise array
-# center around 0 and just guess at standard deviation as it was not
-# reported by Eagleworks
-mu, sigma = 0.0, 0.03  # mean and standard deviation for noise
-noise = numpy.random.normal(mu, sigma, times.size)
-
-# METHOD -- BASED ON Fig. 8
-# waveforms are built based on 0 + change in displacement as reported
-# in force measurements.  This makes superimposing the waveforms
-# easier because they can center on 0 displacement and then be build
-# using change in displacement.
-#
-# The final result can then offset by 1249.360 to get nominal 
-# um of displacement 
-
-# From EW paper P. 4, the dx vs df is computed based on their statement:
-#   " 0.983 um, which corresponds with the calibration pulse magnitude of 29 uN"
-# which means dx/df = 0.0338965517 (this ratio seems to vary in the report?)
-#     On P.5 "two fitted linear equations is 1.078 um, which corresponds with the 
-#     calibration pulse magnitude of 29 uN."
-
+# Based on 29uN as per Figure 8 description
 dx_df = 0.0338965517
 
-cal1_pulse = Pulse(times, high=0, low=-1.078, start=5, end=35, pos=8, neg=5)
-cal2_pulse = Pulse(times, high=0, low=-1.078, start=160, end=180, pos=8, neg=5)
-
-# for impluse they compute 106uN or 3.77 um on Equation 1.
-# (however using computed dx/df above it's more like 111.2 uN)
-# what is right?
-impulse = Pulse(times, high=0, low=0, start=60, end=101, pos=3, neg=3)
-
-# build composite of 2 pulses
-pulse = numpy.add(cal1_pulse.pulse, cal2_pulse.pulse)
-
-# From Fig. 8 using dx=0.13826*t+1245.238 for the thermal pulse slope
-# we find at t=105 the peak is 1259.7553 (from careful plotting, 
-# on graph paper it appears to be 1259.286 at 107min)
-# subtract our offset of 1249.36 then scale is 0->10.3953 for maximum thermal
-# then remove the 'impulse' contribution of 3.77
-thermal = Thermal(times, start=60, offset=-1249.360)
-
-# build composite signal
-# total = numpy.add(pulse, impulse.pulse)
-# total = numpy.add(total, noise)
-# total = numpy.add(total, thermal.thermal)
-# total = numpy.add(total, 1249.360)  # offset dx to nominal
+# Using force pulse model outlined in Figure 5
+# low = -2.076 removes all force from thermal+force curve
+# low = 0 shows 103uN (vs. expected of 106uN)
+# low = -3.77 (or 106uN) yields force of -84.5 uN
+# low = -3.7625 (about 106uN using computed dx/df = 0.0354953532734 from calibration pulses on data
+impulse = ForcePulse(times, high=0, low=3.7625, start=58, end=115)  # timings for this is approximate
 
 # Take total data from EW data - no composite signals used
 total = data.labdata
+total = numpy.add(total, impulse.data)
 
 # REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
-# Compute curve filts for Pulse 1 with 2 time Windows
+# Compute curve fits for Pulse 1 with 2 time Windows
 print("Pulse 1 Top")
 cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
 cal1Top.prnt()
@@ -232,7 +181,7 @@ cal1Bot.prnt()
 print('Eagleworks:  m= 0.005096 b=1248.367 errors m_err=', 0.005096 - cal1Bot.slope, 'b_err=',
       1248.367 - cal1Bot.intercept)
 
-# Compute curve filts for Pulse 2 Windows
+# Compute curve fits for Pulse 2 Windows
 cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
 print("Pulse 2 Top")
 cal2Top.prnt()
@@ -273,19 +222,11 @@ print(val, " um or ", val / dx_df, " uN force and dx/df =", dx_df)
 
 # Plot signals
 fig = plt.figure(figsize=(8, 6), dpi=80)
-ax = fig.add_subplot(4, 1, 1)
-ax.plot(times, impulse.pulse)
+ax = fig.add_subplot(2, 1, 1)
+ax.plot(times, impulse.data)
 ax.set_ylabel('impulse')
 
-ax = fig.add_subplot(4, 1, 2)
-ax.plot(times, pulse)
-ax.set_ylabel('pulse')
-
-ax = fig.add_subplot(4, 1, 3)
-ax.plot(times, thermal.thermal)
-ax.set_ylabel('thermal')
-
-ax = fig.add_subplot(4, 1, 4)
+ax = fig.add_subplot(2, 1, 2)
 ax.plot(times, total)
 ax.set_ylabel('total')
 

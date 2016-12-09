@@ -202,71 +202,59 @@ noise = numpy.random.normal(mu, sigma, times.size)
 # which means dx/df = 0.0338965517 (this ratio seems to vary in the report?)
 #     On P.5 "two fitted linear equations is 1.078 um, which corresponds with the 
 #     calibration pulse magnitude of 29 uN."
-
 dx_df = 0.0338965517
 
-cal1_pulse = Pulse(times, high=0, low=-1.078, start=5, end=35, pos=8, neg=5)
-cal2_pulse = Pulse(times, high=0, low=-1.078, start=160, end=180, pos=8, neg=5)
+peaks = [0, 2.5, 5, 10.035]
+# peaks = [10.035] # Peak shown in Figure 8.
 
-# for impulse force is computed using Fig. 5 model
-impulse = ForcePulse(times, high=0, low=3.77, start=58, end=106)
+impulses = [0, 1, 2, 3, 4]
+# impulses = [3.77]
 
-# build composite of 2 pulses
-pulse = numpy.add(cal1_pulse.data, cal2_pulse.data)
-
-# From Fig. 8:
+# About thermal model from Fig. 8:
 # we find at t=106.43 the peak is 1259.3950437986 from digitizing their plot (see ew-graph.csv),
 # subtract our baseline offset of 1249.36 then scale is 0->10.035 for maximum thermal
 # thermal curve is computed using Figure 5 model
-thermal = Thermal(times, start=60, center=107, offset=0, peak=1259.3950437986 - 1249.360)
+cal1_pulse = Pulse(times, high=0, low=-1.078, start=5, end=35, pos=8, neg=5)
+cal2_pulse = Pulse(times, high=0, low=-1.078, start=160, end=180, pos=8, neg=5)
+pulse = numpy.add(cal1_pulse.data, cal2_pulse.data)
 
-# build composite signal
-total = numpy.add(pulse, impulse.data)
-total = numpy.add(total, noise)
-total = numpy.add(total, thermal.data)
-total = numpy.add(total, 1249.360)  # offset dx to nominal
+print("Force Thermal um uN")
+for peak in peaks:
+    for force in impulses:
+        thermal = Thermal(times, start=60, center=107, offset=0, peak=peak)
+        impulse = ForcePulse(times, high=0, low=force, start=58, end=115)
 
-# REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
-# Compute curve filts for Pulse 1 with 2 time Windows
-print("Pulse 1 Top")
-cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
-cal1Top.prnt()
+        # build composite signal
+        total = numpy.add(pulse, impulse.data)
+        # total = numpy.add(total, noise)
+        total = numpy.add(total, thermal.data)
+        total = numpy.add(total, 1249.360)  # offset dx to nominal
 
-print("Pulse 1 Bottom")
-cal1Bot = Calc(times, total, 11.4, 28.6)  # EW time window
-cal1Bot.prnt()
+        # REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
+        # Compute curve fits for Pulse 1 with 2 time Windows
+        cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
+        cal1Bot = Calc(times, total, 11.4, 28.6)  # EW time window
 
-# Compute curve filts for Pulse 2 Windows
-cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
-print("Pulse 2 Top")
-cal2Top.prnt()
+        # Compute curve fits for Pulse 2 Windows
+        cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
+        cal2Bot = Calc(times, total, 163.2, 171.6)  # EW time window
 
-print("Pulse 2 Bottom")
-cal2Bot = Calc(times, total, 163.2, 171.6)  # EW time window
-cal2Bot.prnt()
+        # Compute Pulse Force
+        f_pulse = Calc(times, total, 83.8, 102.8)  # EW time window 83.8-102.8
 
-# Compute Pulse Force
-print("Pulse Force")
-f_pulse = Calc(times, total, 83.8, 95.)  # EW time window 83.8-100.8
-f_pulse.prnt()
+        Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)  # EW point in time
+        Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)  # EW point in time
 
-print("CAL1 Pulse Separation: ", )
-Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)
-print(Cal1_dx_val, " um or ", Cal1_dx_val / dx_df, " uN force")
+        # Impulse force calculations
+        # compute shifted intercept line using time of 59.0519660294 which
+        # was reverse calculated from Figure 8. when EW computed 1241.468
+        # for their shifted offset
+        shifted_b = (cal1Top.slope - f_pulse.slope) * 59.0519660294 + cal1Top.intercept
+        val = f_pulse.intercept - shifted_b
 
-print("CAL2 Pulse Separation: ", )
-Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)
-print(Cal2_dx_val, " um or ", Cal2_dx_val / dx_df, " uN force")
+        dx_df = ((Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
 
-print("Impulse Force Calculations: ", )
-# compute shifted intercept line using time of 59.0519660294 which
-# was reverse calculated from Figure 8. when EW computed 1241.468
-# for their shifted offset
-shifted_b = (cal1Top.slope - f_pulse.slope) * 59.0519660294 + cal1Top.intercept
-val = f_pulse.intercept - shifted_b
-print('shifted_b =', shifted_b, ' and Cal1 b=', cal1Top.intercept)
-dx_df = ((Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
-print(val, " um or ", val / dx_df, " uN force and dx/df =", dx_df)
+        print(force, peak, val, val / dx_df)
 
 # Plot signals
 fig = plt.figure(figsize=(8, 6), dpi=80)
