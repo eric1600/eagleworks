@@ -239,7 +239,10 @@ dx_df = 0.0338965517
 data = LabData(times)
 
 # peaks = [0, 2.5, 5, 10.035]
-peaks = [6.75]  # Peak shown in Figure 8.
+peaks = numpy.linspace(8, 9.2, (9.2 - 8) / 0.1 + 1, endpoint=True)
+# peaks = [6.75]  # Peak shown in Figure 8.
+
+peaks = [9.0]
 
 # impulses = [0, 1, 2, 3, 4]
 impulses = [3.7625]
@@ -254,52 +257,79 @@ impulses = [3.7625]
 # Pulse model ramps up at 0-1 to a value of 3 until 4-5 where it ramps to 0
 # time and peak values will be scaled to match data as needed
 
+# Optimized curve fit
+# force     peak    pulse rise  pulse fall  therm rise  therm center
+# 3.7625    9.0     58          119.5       47.0        118.0
+# Pearson= 0.990953252406
+
 cal1_pulse = Pulse(times, high=0, low=-1.078, start=5, end=35, pos=8, neg=5)
 cal2_pulse = Pulse(times, high=0, low=-1.078, start=160, end=180, pos=8, neg=5)
 pulse = numpy.add(cal1_pulse.data, cal2_pulse.data)
 
-print("Force Thermal um uN")
+pulser = [57, 58, 59, 59.5]
+# pulser = [59]
+pulsef = [119, 119.5, 120, 120.5, ]
+# pulsef = [119.5]
+thermr = numpy.linspace(45, 50, (50 - 45) / 0.5 + 1, endpoint=True)
+# thermr = [47]
+thermc = numpy.linspace(116, 120, (120 - 116) / .5 + 1, endpoint=True)
+# thermc = [118]
+
+high_r = 0
+
 for peak in peaks:
     for force in impulses:
-        thermal = Thermal(times, start=70, center=114, offset=0, peak=peak)  # start=60, center=107
-        impulse = ForcePulse(times, high=0, low=force, start=62, end=119)  # start = 58, end = 115
+        for p_rise in pulser:
+            for p_fall in pulsef:
+                for t_rise in thermr:
+                    for t_center in thermc:
+                        thermal = Thermal(times, start=70, center=t_center, offset=0, peak=peak)  # start=70, center=114
+                        impulse = ForcePulse(times, high=0, low=force, start=p_rise,
+                                             end=p_fall)  # start = 62, end = 119
 
-        # build composite signal
-        total = numpy.add(pulse, impulse.data)
-        # total = numpy.add(total, noise)
-        total = numpy.add(total, thermal.data)
-        total = numpy.add(total, 1249.360)  # offset dx to nominal
+                        # build composite signal
+                        total = numpy.add(pulse, impulse.data)
+                        # total = numpy.add(total, noise)
+                        total = numpy.add(total, thermal.data)
+                        total = numpy.add(total, 1249.360)  # offset dx to nominal
 
-        # REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
-        # Compute curve fits for Pulse 1 with 2 time Windows
-        cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
-        cal1Bot = Calc(times, total, 11.4, 28.6)  # EW time window
+                        # REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
+                        # Compute curve fits for Pulse 1 with 2 time Windows
+                        cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
+                        cal1Bot = Calc(times, total, 11.4, 28.6)  # EW time window
 
-        # Compute curve fits for Pulse 2 Windows
-        cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
-        cal2Bot = Calc(times, total, 163.2, 171.6)  # EW time window
+                        # Compute curve fits for Pulse 2 Windows
+                        cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
+                        cal2Bot = Calc(times, total, 163.2, 171.6)  # EW time window
 
-        # Compute Pulse Force
-        f_pulse = Calc(times, total, 83.8, 102.8)  # EW time window 83.8-102.8
+                        # Compute Pulse Force
+                        f_pulse = Calc(times, total, 83.8, 102.8)  # EW time window 83.8-102.8
 
-        Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)  # EW point in time
-        Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)  # EW point in time
+                        Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)  # EW point in time
+                        Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)  # EW point in time
 
-        # Impulse force calculations
-        # compute shifted intercept line using time of 59.0519660294 which
-        # was reverse calculated from Figure 8. when EW computed 1241.468
-        # for their shifted offset
-        shifted_b = (cal1Top.slope - f_pulse.slope) * 59.0519660294 + cal1Top.intercept
-        val = f_pulse.intercept - shifted_b
+                        # Impulse force calculations
+                        # compute shifted intercept line using time of 59.0519660294 which
+                        # was reverse calculated from Figure 8. when EW computed 1241.468
+                        # for their shifted offset
+                        shifted_b = (cal1Top.slope - f_pulse.slope) * 59.0519660294 + cal1Top.intercept
+                        val = f_pulse.intercept - shifted_b
 
-        dx_df = ((Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
+                        dx_df = ((
+                                 Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
 
-        print(force, peak, val, val / dx_df)
+                        # print(force, peak, val, val / dx_df)
 
-# Pearson Coefficient
-# https://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
-# how to understand http://www.statstutor.ac.uk/resources/uploaded/pearsons.pdf
-pearson=pearsonr(total, data.data)[0]
+                        # Pearson Coefficient
+                        # https://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
+                        # how to understand http://www.statstutor.ac.uk/resources/uploaded/pearsons.pdf
+                        pearson = pearsonr(total, data.data)[0]
+                        if (high_r < pearson):
+                            print("**** NEW HIGH ****")
+                            print(" ** ", force, peak, p_rise, p_fall, t_rise, t_center)
+                            print("Pearson=", pearson)
+                            high_r = pearson
+                            print
 
 # Plot signals
 fig = plt.figure(figsize=(8, 6), dpi=80)
@@ -335,29 +365,8 @@ ax.set_ylabel('Displacement (um)')
 ax.set_xlabel('Time (s)')
 plt.legend(loc='upper right')
 
-#  'r' = red
-#  'g' = green
-#  'b' = blue
-#  'c' = cyan
-#  'm' = magenta
-#  'y' = yellow
-#  'k' = black
-#  'w' = white
-#
-# Options for line styles are
-#
-#  '-' = solid
-#  '--' = dashed
-#  ':' = dotted
-#  '-.' = dot-dashed
-#  '.' = points
-#  'o' = filled circles
-#  '^' = filled triangles
-
-
 fig.savefig('signals_t5.png')
 fig1.savefig('combined_t5.png')
 
 # Uncomment if you prefer on-screen plots
-plt.show()
-
+# plt.show()
