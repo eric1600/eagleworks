@@ -8,7 +8,7 @@ import csv
 
 
 class LabData:
-    """Handle measured data"""
+    """Handle measured data from csv file"""
 
     def __init__(self, time, filename='ew-graph.csv'):
         tdata = numpy.array([])
@@ -24,6 +24,7 @@ class LabData:
         tdata = tdata.astype('float64')
         xdata = xdata.astype('float64')
 
+        # interpolate any missing time points using numpy.interp
         for t in numpy.nditer(time):
             if t <= tdata[0]:
                 xsample = numpy.append(xsample, xdata[0])
@@ -80,7 +81,7 @@ class ForcePulse:
         # top (1-4): f(x) = 0.0012770362x + 3.0165657699
         # R^2 = 0.9999989071
         # peak value = 3.0215812262
-        peak = 3.0215812262
+        peak = 3.0215812262 # used for scaling model to desired levels of low and high
 
         # fall (4-5): f(x) =  - 2.9987385162x + 14.9945782273
         # R^2 = 0.998996942
@@ -114,46 +115,6 @@ class ForcePulse:
             elif t >= start + fall_done:
                 value = high / peak
 
-            signal = numpy.append(signal, value)
-        self.data = signal
-
-
-class Thermal:
-    """Generate thermal signal profile using Fig 5 curve fit"""
-
-    def __init__(self, time, start=60., center=100, offset=0., peak=1259.7553):
-        signal = numpy.array([])
-        # full rise-fall curve fit with curve fit from Figure 5.
-        # curve fit r^2 = 0.99361
-
-        for t in numpy.nditer(time):
-            if t < center:
-                if t < start:
-                    value = 0  # RF amp off, no thermal
-                else:
-                    # rise curve
-                    # rise curve(0-5):  f(x) =  - 0.0064354826x^4 + 0.0903571004x^3 - 0.5212241274x^2 + 1.947007813x + 0.0530313985
-                    # rise x=0 at start, x=5 at center
-                    x = (t - start) * 5 / (center - start)
-                    value = - 0.0064354826 * numpy.power(x, 4) + 0.0903571004 * numpy.power(x,
-                                                                                            3) - 0.5212241274 * numpy.power(
-                        x, 2) + 1.947007813 * x + 0.0530313985
-            else:
-                # fall curve(5-10): f(x) = 0.0065180865x^4 - 0.2227500576x^3 + 2.8971895487x^2 - 17.4937755423x + 42.8137121961
-                # fall x=5 at start to x=10 at end (time[-1])
-                x = 5 + (t - center) * 5 / (time[-1] - center)
-                value = 0.0065180865 * numpy.power(x, 4) - 0.2227500576 * numpy.power(x,
-                                                                                      3) + 2.8971895487 * numpy.power(x,
-                                                                                                                      2) - 17.4937755423 * x + 42.8137121961
-
-                #new fall curve with pulse removed
-                # where x is 5-10
-                # f(x) = 0.011593513*x ^ 4 - 0.3471951054*x ^ 3 + 3.9315496083*x ^ 2 - 20.8417922356*x + 46.1200791522
-                # R^2 = 0.9991414356
-                value= 0.011593513*numpy.power(x,4) - 0.3471951054*numpy.power(x,3) + 3.9315496083*numpy.power(x,2) - 20.8417922356 * x + 46.1200791522
-
-            value = peak / 4 * value  # rescale amplitude
-            value = value + offset
             signal = numpy.append(signal, value)
         self.data = signal
 
@@ -242,40 +203,28 @@ noise = numpy.random.normal(mu, sigma, times.size)
 dx_df = 0.0338965517
 
 # Load Lab Data
+# ew-graph.csv - lab data unmodified
 # ew-noforce.csv - lab data with pulse extracted using pulse model
 # ew-noforce-modified.cvs - lab data with extracted pulse but curve cleaned up
-data = LabData(times, 'ew-noforce.csv')
-
-# About thermal model from Fig. 8:
-# we find at t=106.43 the peak is 1259.3950437986 from digitizing their plot (see ew-graph.csv),
-# subtract our baseline offset of 1249.36 then scale is 0->10.035 for maximum thermal
-# thermal curve is computed using Figure 5 model
+# ew-noforce-modified2.cvs - lab data with more smoothing using linear interpolation
+data = LabData(times, 'ew-graph.csv')
 
 # Based on Figure 5:
-# Thermal model peaks at 4.04 at 5 seconds
 # Pulse model ramps up at 0-1 to a value of 3 until 4-5 where it ramps to 0
 # time and peak values will be scaled to match data as needed
-
-# Optimized curve fit
-# force     peak    pulse rise  pulse fall  therm rise  therm center
-# 3.7625    9.0     58          119         45.0        118.0
-# Pearson= 0.991004497475
-
 cal1_pulse = Pulse(times, high=0, low=-1.078, start=5, end=35, pos=8, neg=5)
 cal2_pulse = Pulse(times, high=0, low=-1.078, start=160, end=180, pos=8, neg=5)
 pulse = numpy.add(cal1_pulse.data, cal2_pulse.data)
 
-peak = 8.2  # Peak shown in Figure 8.
+thermal = LabData(times, 'ew-noforce-modified2.csv')
 
-thermal = Thermal(times, start=75, center=116, offset=1249.360, peak=peak)  # start=70, center=114
-# force = -3.7625
-force = 0
+force = 3.7625
 impulse = ForcePulse(times, high=0, low=force, start=62, end=119)  # start = 62, end = 119
 
-# build composite signal
+# build signal from modified EW data that is smothed and has pulses removed
 total = numpy.add(pulse, impulse.data)
-# total = numpy.add(total, noise)
 total = numpy.add(total, thermal.data)
+# total = numpy.add(total, noise)
 #total = numpy.add(total, 1249.360)  # offset dx to nominal
 
 # REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
@@ -292,18 +241,25 @@ f_pulse = Calc(times, total, 83.8, 102.8)  # EW time window 83.8-102.8
 
 Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)  # EW point in time
 Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)  # EW point in time
+dx_df = ((Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
+print ("dx/df = ",dx_df)
 
 # Impulse force calculations
-# compute shifted intercept line using time of 59.0519660294 which
+#
+# Compute shifted intercept line using time of 59.0519660294 which
 # was reverse calculated from Figure 8. when EW computed 1241.468
-# for their shifted offset
-shifted_b = (cal1Top.slope - f_pulse.slope) * 59.0519660294 + cal1Top.intercept
-val = f_pulse.intercept - shifted_b
+# for their shifted offset.  This technique was not documented and had to be reverse engineered.
+#
+# A time loop added to show variations due to unknown method used by Eagleworks
+#
+print("{: >20}, {: >20}, {: >20}, {: >20}, {: >20}, {: >20}".format("time (s)","shifted_b","force_dx (um)","Calc (um)","Calc (uN)","Error (um)"))
+for t in [55,56,57,58,59.0519660294,60,61,62,63,64,65]:
+    shifted_b = (cal1Top.slope - f_pulse.slope) * t + cal1Top.intercept
+    val = f_pulse.intercept - shifted_b
 
-dx_df = ((Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
 
-print("Force  peak  um  uN")
-print(force, peak, val, val / dx_df)
+    print("{: >20}, {: >20}, {: >20}, {: >20}, {: >20}, {: >20}".format(t, shifted_b, force, val, val / dx_df,force-val))
+#    print(t, shifted_b, force, val, val / dx_df)
 
 # Plot signals
 fig = plt.figure(figsize=(8, 6), dpi=80)
@@ -327,7 +283,7 @@ ax.set_xlabel('time (s)')
 # Create larger result plot with linear line estimates added in
 fig1 = plt.figure(figsize=(8, 6), dpi=80)
 ax = fig1.add_subplot(111)
-plt.plot(times, total, '-k', label="Total")
+plt.plot(times, total, '-k', label="Model")
 plt.plot(times, data.data, '-m', label='Lab Data', linewidth=3.0)
 plt.plot(cal1Top.time, cal1Top.interp(), '-r', label='Cal1 Top', linewidth=3.0)
 plt.plot(cal1Bot.time, cal1Bot.interp(), '-b', label='Cal1 Bot', linewidth=3.0)
@@ -338,28 +294,8 @@ ax.set_ylabel('Displacement (um)')
 ax.set_xlabel('Time (s)')
 plt.legend(loc='upper right')
 
-#  'r' = red
-#  'g' = green
-#  'b' = blue
-#  'c' = cyan
-#  'm' = magenta
-#  'y' = yellow
-#  'k' = black
-#  'w' = white
-#
-# Options for line styles are
-#
-#  '-' = solid
-#  '--' = dashed
-#  ':' = dotted
-#  '-.' = dot-dashed
-#  '.' = points
-#  'o' = filled circles
-#  '^' = filled triangles
-
-
-fig.savefig('signals_t6.png')
-fig1.savefig('combined_t6.png')
+fig.savefig('signals_t7.png')
+fig1.savefig('combined_t7.png')
 
 # Uncomment if you prefer on-screen plots
-plt.show()
+#plt.show()
