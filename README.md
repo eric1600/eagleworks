@@ -4,6 +4,8 @@ This is some python code to attempt to duplicate the calculations done in a pape
 
 ## Background
 
+I've now writting a detailed summary of the ![numerical results](./Numerical-Results.pdf) which explain the various modeling efforts and errors found during the analysis.  Essentially the model proposed by Eagleworks does not work and a new model using transients and a heat profile fits better.  However the report is quite detailed and covers a lot of issues.
+
 See the files in this repository for more background information on how the plots were generated and how you can contribute to making this simulation either demonstrate the idea of superimposed impluse force from the EM Drive is properly analyzed.  It is my hope that the raw test data will be released to the public so it can be statistically analysed instead of simulated as it is done here.
 
 ![Eagleworks Paper in PDF](./final-paper.pdf)
@@ -43,6 +45,12 @@ This was an attempt to vary all parameters to fit Eagleworks proposed model to t
 
 * test7.py
 This is an ongoing experiement to generate a thermal model from their data by removing their proposed force impluse and curve fitting the thermal data.  However it was found that their idea of superimposing these two curves also does not fit the data.
+
+* test8.py
+Uses a thermal heat and two transients to model the Eagelworks data with much success.
+
+* test9.py
+Used for estimating error propagations in the measurement methods
 
 ## Contributors
 

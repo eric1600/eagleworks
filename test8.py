@@ -8,7 +8,7 @@ import csv
 
 
 class LabData:
-    """Handle measured data"""
+    """Handle measured data from csv file"""
 
     def __init__(self, time, filename='ew-graph.csv'):
         tdata = numpy.array([])
@@ -24,6 +24,7 @@ class LabData:
         tdata = tdata.astype('float64')
         xdata = xdata.astype('float64')
 
+        # interpolate any missing time points using numpy.interp
         for t in numpy.nditer(time):
             if t <= tdata[0]:
                 xsample = numpy.append(xsample, xdata[0])
@@ -80,7 +81,7 @@ class ForcePulse:
         # top (1-4): f(x) = 0.0012770362x + 3.0165657699
         # R^2 = 0.9999989071
         # peak value = 3.0215812262
-        peak = 3.0215812262
+        peak = 3.0215812262  # used for scaling model to desired levels of low and high
 
         # fall (4-5): f(x) =  - 2.9987385162x + 14.9945782273
         # R^2 = 0.998996942
@@ -118,35 +119,41 @@ class ForcePulse:
         self.data = signal
 
 
-class Thermal:
-    """Generate thermal signal profile using Fig 5 curve fit"""
+class ThermalPulse:
+    """Build Thermal Force Pulse Signal assuming rapid heating then decay"""
 
-    def __init__(self, time, start=60., center=100, offset=0., peak=1259.7553):
+    def __init__(self, time, high=10., low=5., start=60., end=120., pos=5., neg=6., slope=1, trailing=0,
+                 trail_stop=0):
         signal = numpy.array([])
-        # full rise-fall curve fit with curve fit from Figure 5.
-        # curve fit r^2 = 0.99361
-
+        top_slope = slope  # amount to decrease pulse value (1=none or flat)
+        top_ending=0
         for t in numpy.nditer(time):
-            if t < center:
-                if t < start:
-                    value = 0  # RF amp off, no thermal
-                else:
-                    # rise curve
-                    # rise curve(0-5):  f(x) =  - 0.0064354826x^4 + 0.0903571004x^3 - 0.5212241274x^2 + 1.947007813x + 0.0530313985
-                    # rise x=0 at start, x=5 at center
-                    x = (t - start) * 5 / (center - start)
-                    value = - 0.0064354826 * numpy.power(x, 4) + 0.0903571004 * numpy.power(x,
-                                                                                            3) - 0.5212241274 * numpy.power(
-                        x, 2) + 1.947007813 * x + 0.0530313985
-            else:
-                # fall curve(5-10): f(x) = 0.0065180865x^4 - 0.2227500576x^3 + 2.8971895487x^2 - 17.4937755423x + 42.8137121961
-                # fall x=5 at start to x=10 at end (time[-1])
-                x = 5 + (t - center) * 5 / (time[-1] - center)
-                value = 0.0065180865 * numpy.power(x, 4) - 0.2227500576 * numpy.power(x,
-                                                                                      3) + 2.8971895487 * numpy.power(x,
-                                                                                                                      2) - 17.4937755423 * x + 42.8137121961
-            value = peak / 4 * value  # rescale amplitude
-            value = value + offset
+            value = 0
+            if t > trail_stop:
+                trailing = 0
+            if t < start:
+                value = high
+            elif t < start + neg:
+                # linear slope start of pulse
+                m = (low - high) / neg
+                b = low - m * neg
+                value = m * (t - start) + b
+            elif t < end - pos:
+                # slope pulse top based on top_slope
+                stop_value = top_slope * low
+                m = (low - stop_value) / ((start + neg) - (end - pos))
+                b = stop_value - m * (end - pos)
+                value = m * t + b
+                top_ending = value
+            elif t < end:
+                # linear slope end of pulse with trailing value
+                m = (top_ending - (high + trailing)) / pos
+                b = top_ending - m * pos
+                value = m * (end - t) + b
+                if t > trail_stop:
+                    value = value + trailing
+            elif t >= end:
+                value = high + trailing
             signal = numpy.append(signal, value)
         self.data = signal
 
@@ -236,106 +243,118 @@ noise = numpy.random.normal(mu, sigma, times.size)
 dx_df = 0.0338965517
 
 # Load Lab Data
-data = LabData(times)
-
-# peaks = [0, 2.5, 5, 10.035]
-peaks = numpy.linspace(8, 9.2, (9.2 - 8) / 0.1 + 1, endpoint=True)
-# peaks = [6.75]  # Peak shown in Figure 8.
-
-peaks = [7.75]
-
-# impulses = [0, 1, 2, 3, 4]
-impulses = [3.7625]
-
-# About thermal model from Fig. 8:
-# we find at t=106.43 the peak is 1259.3950437986 from digitizing their plot (see ew-graph.csv),
-# subtract our baseline offset of 1249.36 then scale is 0->10.035 for maximum thermal
-# thermal curve is computed using Figure 5 model
+# ew-graph.csv - lab data unmodified
+# ew-noforce.csv - lab data with pulse extracted using pulse model
+# ew-noforce-modified.cvs - lab data with extracted pulse but curve cleaned up
+# ew-noforce-modified2.cvs - lab data with more smoothing using linear interpolation
+data = LabData(times, 'ew-graph.csv')
 
 # Based on Figure 5:
-# Thermal model peaks at 4.04 at 5 seconds
 # Pulse model ramps up at 0-1 to a value of 3 until 4-5 where it ramps to 0
 # time and peak values will be scaled to match data as needed
-
-# Optimized curve fit
-# force     peak    pulse rise  pulse fall  therm rise  therm center
-# 3.7625    9.0     58          119.5       47.0        118.0
-# Pearson= 0.990953252406
-
-cal1_pulse = Pulse(times, high=0, low=-1.078, start=5, end=35, pos=8, neg=5)
-cal2_pulse = Pulse(times, high=0, low=-1.078, start=160, end=180, pos=8, neg=5)
+cal1_pulse = ThermalPulse(times, high=0, low=-1.0, start=5, end=35, pos=8, neg=5, slope=0.95)
+cal2_pulse = ThermalPulse(times,high=0,low=-1.0, start=160,end=180,pos=8,neg=5, slope=0.87)
 pulse = numpy.add(cal1_pulse.data, cal2_pulse.data)
 
-pulser = [57, 58, 59, 59.5]
-pulser = [66]
-pulsef = [119, 119.5, 120, 120.5, ]
-pulsef = [110]
-thermr = numpy.linspace(45, 50, (50 - 45) / 0.5 + 1, endpoint=True)
-thermr = [65]
-thermc = numpy.linspace(116, 120, (120 - 116) / .5 + 1, endpoint=True)
-thermc = [118]
+thermal = LabData(times, 'ew-noforce-modified2.csv')
 
-high_r = 0
+force = 3.85
+#force = 4
+# using modified thermal pulse for non-linear heating at beginning of power on
+impulse = ThermalPulse(times, high=0, low=force, start=63, end=110, pos=6, neg=13, slope=0.8)
+transient_off=ThermalPulse(times, high=0, low=force/4, start=105.5, end=113, pos=1, neg=1, slope=.5)
+impulse.data=numpy.add(impulse.data,transient_off.data)
+transient_on=ThermalPulse(times, high=0, low=force/6, start=60, end=74, pos=3, neg=1, slope=.5)
+impulse.data=numpy.add(impulse.data,transient_on.data)
 
-for peak in peaks:
-    for force in impulses:
-        for p_rise in pulser:
-            for p_fall in pulsef:
-                for t_rise in thermr:
-                    for t_center in thermc:
-                        thermal = Thermal(times, start=70, center=t_center, offset=0, peak=peak)  # start=70, center=114
-                        impulse = ForcePulse(times, high=0, low=force, start=p_rise,
-                                             end=p_fall)  # start = 62, end = 119
+# build signal from modified EW data that is smoothed and has pulses removed
+total = numpy.add(pulse, impulse.data)
+total = numpy.add(total, thermal.data)
+# total = numpy.add(total, noise)
 
-                        # build composite signal
-                        total = numpy.add(pulse, impulse.data)
-                        # total = numpy.add(total, noise)
-                        total = numpy.add(total, thermal.data)
-                        total = numpy.add(total, 1249.360)  # offset dx to nominal
+# REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
+# Compute curve fits for Pulse 1 with 2 time Windows
+cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
+cal1Bot = Calc(times, total, 11.4, 28.6)  # EW time window
 
-                        # REVERSE CALCULATIONS -- Discussion on pp.4-5 gives sample times
-                        # Compute curve fits for Pulse 1 with 2 time Windows
-                        cal1Top = Calc(times, total, 0, 4.4, 44.6, 57.6)  # EW time window
-                        cal1Bot = Calc(times, total, 11.4, 28.6)  # EW time window
+# Compute curve fits for Pulse 2 Windows
+cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
+cal2Bot = Calc(times, total, 163.2, 171.6)  # EW time window
 
-                        # Compute curve fits for Pulse 2 Windows
-                        cal2Top = Calc(times, total, 155, 158.6, 178.8, 184)  # EW time window
-                        cal2Bot = Calc(times, total, 163.2, 171.6)  # EW time window
+# Compute Pulse Force
+f_pulse = Calc(times, total, 83.8, 102.8)  # EW time window 83.8-102.8
 
-                        # Compute Pulse Force
-                        f_pulse = Calc(times, total, 83.8, 102.8)  # EW time window 83.8-102.8
+Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)  # EW point in time
+Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)  # EW point in time
+dx_df = ((Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
+print("dx/df = ", dx_df)
 
-                        Cal1_dx_val = cal1Top.estimate(20.2) - cal1Bot.estimate(20.2)  # EW point in time
-                        Cal2_dx_val = cal2Top.estimate(167) - cal2Bot.estimate(167)  # EW point in time
+# Impulse force calculations
+#
+# Compute shifted intercept line using time of 59.0519660294 which
+# was reverse calculated from Figure 8. when EW computed 1241.468
+# for their shifted offset.  This technique was not documented and had to be reverse engineered.
+#
+# A time loop added to show variations due to unknown method used by Eagleworks
+#
+print(
+    "{: >20}, {: >20}, {: >20}, {: >20}, {: >20}, {: >20}".format("time (s)", "shifted_b", "force_dx (um)", "Calc (um)",
+                                                                  "Calc (uN)", "Error (um)"))
+slope_times=[55, 56, 57, 58, 59.0519660294, 60, 61, 62, 63, 64, 65]
+#slope_times=[59.0519660294]
+for t in slope_times:
+    shifted_b = (cal1Top.slope - f_pulse.slope) * t + cal1Top.intercept
+    val = f_pulse.intercept - shifted_b
 
-                        # Impulse force calculations
-                        # compute shifted intercept line using time of 59.0519660294 which
-                        # was reverse calculated from Figure 8. when EW computed 1241.468
-                        # for their shifted offset
-                        shifted_b = (cal1Top.slope - f_pulse.slope) * 59.0519660294 + cal1Top.intercept
-                        val = f_pulse.intercept - shifted_b
+    print("{: >20}, {: >20}, {: >20}, {: >20}, {: >20}, {: >20}".format(t, shifted_b, force, val, val / dx_df,
+                                                                        force - val))
 
-                        dx_df = ((
-                                 Cal1_dx_val + Cal2_dx_val) / 2) / 29  # 29uN, but x is normalized from um so E-6 is dropped
+print("Pulse 1 Top")
+cal1Top.prnt()
+print('Eagleworks:  m= 0.004615 b=1249.360 errors m_err=', 0.004615 - cal1Top.slope, 'b_err=',
+      1249.360 - cal1Top.intercept)
+print("Pulse 1 Bottom")
+cal1Bot.prnt()
+print('Eagleworks:  m= 0.005096 b=1248.367 errors m_err=', 0.005096 - cal1Bot.slope, 'b_err=',
+      1248.367 - cal1Bot.intercept)
+print("Pulse 2 Top")
+cal2Top.prnt()
+print('Eagleworks:  m= -0.07825 b=1263.499  errors m_err=', -0.07825 - cal2Top.slope, 'b_err=',
+      1263.499 - cal2Top.intercept)
+print("Pulse 2 Bottom")
+cal2Bot.prnt()
+print('Eagleworks:  m= -0.0827 b=1263.163   errors m_err=', -0.0827 - cal2Bot.slope, 'b_err=',
+      1263.163 - cal2Bot.intercept)
+print("Pulse Force")
+f_pulse.prnt()
+print('Eagleworks:  m=0.13826 b=1245.238  errors m_err=', 0.13826 - f_pulse.slope, 'b_err=',
+      1245.238 - f_pulse.intercept)
 
-                        print(force, peak, val, val / dx_df)
+print("CAL1 Pulse Separation: ", )
+print(Cal1_dx_val, " um or ", Cal1_dx_val / dx_df, " uN force")
 
-                        # Pearson Coefficient
-                        # https://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
-                        # how to understand http://www.statstutor.ac.uk/resources/uploaded/pearsons.pdf
-                        pearson = pearsonr(total, data.data)[0]
-                        if (high_r < pearson):
-                            print("**** NEW HIGH ****")
-                            print(" ** ", force, peak, p_rise, p_fall, t_rise, t_center)
-                            print("Pearson=", pearson)
-                            high_r = pearson
-                            print
+print("CAL2 Pulse Separation: ", )
+print(Cal2_dx_val, " um or ", Cal2_dx_val / dx_df, " uN force")
+
+print("Impulse Force Calculations: ", )
+t=59.0519660294
+shifted_b = (cal1Top.slope - f_pulse.slope) * t + cal1Top.intercept
+val = f_pulse.intercept - shifted_b
+print('shifted_b =', shifted_b, ' and Cal1 b=', cal1Top.intercept)
+print('Eagleworks shifted_b=1241.468 error =', 1241.468 - shifted_b)
+print(val, " um or ", val / dx_df, " uN force and dx/df =", dx_df)
+
+
 
 # Plot signals
 fig = plt.figure(figsize=(8, 6), dpi=80)
 ax = fig.add_subplot(4, 1, 1)
-ax.plot(times, impulse.data)
-ax.set_ylabel('impulse')
+ax.plot(times, impulse.data,'-r', label='Total', linewidth=2.0)
+ax.plot(times, ThermalPulse(times, high=0, low=force, start=63, end=110, pos=6, neg=13, slope=0.8).data,'--k', label='Heat', linewidth=2.0)
+ax.plot(times, transient_on.data,':b', label='On', linewidth=2.0)
+ax.plot(times, transient_off.data,':g', label='Off', linewidth=2.0)
+ax.set_ylabel('Displacement (um)')
+plt.legend(loc='upper right')
 
 ax = fig.add_subplot(4, 1, 2)
 ax.plot(times, pulse)
@@ -353,20 +372,19 @@ ax.set_xlabel('time (s)')
 # Create larger result plot with linear line estimates added in
 fig1 = plt.figure(figsize=(8, 6), dpi=80)
 ax = fig1.add_subplot(111)
-plt.plot(times, total, '-k', label="Total")
+plt.plot(times, total, '-k', label="Model")
 plt.plot(times, data.data, '-m', label='Lab Data', linewidth=3.0)
 plt.plot(cal1Top.time, cal1Top.interp(), '-r', label='Cal1 Top', linewidth=3.0)
 plt.plot(cal1Bot.time, cal1Bot.interp(), '-b', label='Cal1 Bot', linewidth=3.0)
 plt.plot(f_pulse.time, f_pulse.interp(), '-c', label='Pulse', linewidth=3.0)
 plt.plot(cal2Top.time, cal2Top.interp(), '-r', label='Cal2 Top', linewidth=3.0)
 plt.plot(cal2Bot.time, cal2Bot.interp(), '-b', label='Cal2 Bot', linewidth=3.0)
-plt.text(14, 1258, "Pearson={0:0.5f}".format(pearson))
 ax.set_ylabel('Displacement (um)')
 ax.set_xlabel('Time (s)')
 plt.legend(loc='upper right')
 
-fig.savefig('signals_t5.png')
-fig1.savefig('combined_t5.png')
+fig.savefig('signals_t8.png')
+fig1.savefig('combined_t8.png')
 
 # Uncomment if you prefer on-screen plots
 plt.show()
